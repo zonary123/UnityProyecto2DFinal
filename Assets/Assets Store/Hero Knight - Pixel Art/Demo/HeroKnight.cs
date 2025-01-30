@@ -1,298 +1,271 @@
-﻿using System;
-using UnityEngine;
-using System.Collections;
-using UnityEditor;
-using UnityEngine.InputSystem;
+﻿using UnityEngine;
 
-public class HeroKnight : MonoBehaviour {
+public class HeroKnight : MonoBehaviour{
+	[SerializeField] private float m_speed = 4.0f;
+	[SerializeField] private float m_jumpForce = 7.5f;
+	[SerializeField] private float m_rollForce = 6.0f;
+	[SerializeField] private bool m_noBlood;
 
-    [SerializeField] float      m_speed = 4.0f;
-    [SerializeField] float      m_jumpForce = 7.5f;
-    [SerializeField] float      m_rollForce = 6.0f;
-    [SerializeField] bool       m_noBlood = false;
-    [SerializeField] GameObject m_slideDust;
+	[SerializeField] private GameObject m_slideDust;
 
-    private Animator            m_animator;
-    private Rigidbody2D         m_body2d;
-    private Sensor_HeroKnight   m_groundSensor;
-    private Sensor_HeroKnight   m_wallSensorR1;
-    private Sensor_HeroKnight   m_wallSensorR2;
-    private Sensor_HeroKnight   m_wallSensorL1;
-    private Sensor_HeroKnight   m_wallSensorL2;
-    private bool                m_isWallSliding = false;
-    private bool                m_grounded = false;
-    private bool                m_rolling = false;
-    private int                 m_facingDirection = 1;
-    private int                 m_currentAttack = 0;
-    private float               m_timeSinceAttack = 0.0f;
-    private float               m_delayToIdle = 0.0f;
-    private float               m_rollDuration = 8.0f / 14.0f;
-    private float               m_rollCurrentTime;
-    // Variables creadas por mi
-    [Header("Whip")]
-    [SerializeField]private float m_distanceWhip = 6;
-    [Header("Health")]
-    [SerializeField]private int health = 4;
-    [SerializeField]private int maxHealth = 4;
-    [Header("Invincible")]
-    [SerializeField]private float timeInvincible = 2.0f;
-    [SerializeField]private bool isInvincible = false;
-    [Header("Death")]
-    [SerializeField]private bool isDead = false;
-    [Header("Fall Damage")]
-    [SerializeField]private float maxDistanceYFallDamage = 10.0f;
-    [SerializeField]private float distanceYFall = 0;
-    [SerializeField] private bool doDamageFall = false;
-    [Header("Inventory")] public Inventory inventory{ get; set; } = new Inventory();
+	// Variables creadas por mi
+	[Header("Whip")] [SerializeField] private float m_distanceWhip = 6;
 
-    // Use this for initialization
-    void Start (){
-        health = maxHealth;
-        m_animator = GetComponent<Animator>();
-        m_body2d = GetComponent<Rigidbody2D>();
-        m_groundSensor = transform.Find("GroundSensor").GetComponent<Sensor_HeroKnight>();
-        m_wallSensorR1 = transform.Find("WallSensor_R1").GetComponent<Sensor_HeroKnight>();
-        m_wallSensorR2 = transform.Find("WallSensor_R2").GetComponent<Sensor_HeroKnight>();
-        m_wallSensorL1 = transform.Find("WallSensor_L1").GetComponent<Sensor_HeroKnight>();
-        m_wallSensorL2 = transform.Find("WallSensor_L2").GetComponent<Sensor_HeroKnight>();
-    }
+	[Header("Health")] [SerializeField] private int health = 4;
 
-    // Update is called once per frame
-    void Update ()
-    {
-        // Increase timer that controls attack combo
-        m_timeSinceAttack += Time.deltaTime;
+	[SerializeField] private int maxHealth = 4;
 
-        // Increase timer that checks roll duration
-        if(m_rolling)
-            m_rollCurrentTime += Time.deltaTime;
+	[Header("Invincible")] [SerializeField]
+	private float timeInvincible = 2.0f;
 
-        // Disable rolling if timer extends duration
-        if(m_rollCurrentTime > m_rollDuration)
-            m_rolling = false;
+	[SerializeField] private bool isInvincible;
 
-        //Check if character just landed on the ground
-        if (!m_grounded && m_groundSensor.State())
-        {
-            m_grounded = true;
-            m_animator.SetBool("Grounded", m_grounded);
-        }
+	[Header("Death")] [SerializeField] private bool isDead;
 
-        //Check if character just started falling
-        if (m_grounded && !m_groundSensor.State())
-        {
-            m_grounded = false;
-            m_animator.SetBool("Grounded", m_grounded);
-        }
+	[Header("Fall Damage")] [SerializeField]
+	private float maxDistanceYFallDamage = 10.0f;
 
-        // -- Handle input and movement --
-        float inputX = Input.GetAxis("Horizontal");
+	[SerializeField] private float distanceYFall;
+	[SerializeField] private bool doDamageFall;
+	private readonly float m_rollDuration = 8.0f / 14.0f;
 
-        // Swap direction of sprite depending on walk direction
-        if (inputX > 0)
-        {
-            GetComponent<SpriteRenderer>().flipX = false;
-            m_facingDirection = 1;
-        }
-            
-        else if (inputX < 0)
-        {
-            GetComponent<SpriteRenderer>().flipX = true;
-            m_facingDirection = -1;
-        }
+	private Animator m_animator;
+	private Rigidbody2D m_body2d;
+	private int m_currentAttack;
+	private float m_delayToIdle;
+	private int m_facingDirection = 1;
+	private bool m_grounded;
+	private Sensor_HeroKnight m_groundSensor;
+	private bool m_isWallSliding;
+	private float m_rollCurrentTime;
+	private bool m_rolling;
+	private float m_timeSinceAttack;
+	private Sensor_HeroKnight m_wallSensorL1;
+	private Sensor_HeroKnight m_wallSensorL2;
+	private Sensor_HeroKnight m_wallSensorR1;
+	private Sensor_HeroKnight m_wallSensorR2;
+	[Header("Inventory")] public Inventory inventory{ get; set; } = new();
 
-        // Move
-        if (!m_rolling )
-            m_body2d.linearVelocity = new Vector2(inputX * m_speed, m_body2d.linearVelocity.y);
+	// Use this for initialization
+	private void Start(){
+		health = maxHealth;
+		m_animator = GetComponent<Animator>();
+		m_body2d = GetComponent<Rigidbody2D>();
+		m_groundSensor = transform.Find("GroundSensor").GetComponent<Sensor_HeroKnight>();
+		m_wallSensorR1 = transform.Find("WallSensor_R1").GetComponent<Sensor_HeroKnight>();
+		m_wallSensorR2 = transform.Find("WallSensor_R2").GetComponent<Sensor_HeroKnight>();
+		m_wallSensorL1 = transform.Find("WallSensor_L1").GetComponent<Sensor_HeroKnight>();
+		m_wallSensorL2 = transform.Find("WallSensor_L2").GetComponent<Sensor_HeroKnight>();
+	}
 
-        //Set AirSpeed in animator
-        m_animator.SetFloat("AirSpeedY", m_body2d.linearVelocity.y);
+	// Update is called once per frame
+	private void Update(){
+		// Increase timer that controls attack combo
+		m_timeSinceAttack += Time.deltaTime;
 
-        // -- Handle Animations --
-        //Wall Slide
-        m_isWallSliding = (m_wallSensorR1.State() && m_wallSensorR2.State()) || (m_wallSensorL1.State() && m_wallSensorL2.State());
-        m_animator.SetBool("WallSlide", m_isWallSliding);
+		// Increase timer that checks roll duration
+		if (m_rolling)
+			m_rollCurrentTime += Time.deltaTime;
 
-        //Death
-        if (Input.GetKeyDown("e") && !m_rolling)
-        {
-            m_animator.SetBool("noBlood", m_noBlood);
-            m_animator.SetTrigger("Death");
-        }
-            
-        //Hurt
-        else if (Input.GetKeyDown("q") && !m_rolling)
-            m_animator.SetTrigger("Hurt");
+		// Disable rolling if timer extends duration
+		if (m_rollCurrentTime > m_rollDuration)
+			m_rolling = false;
 
-        //Attack
-        else if(Input.GetMouseButtonDown(0) && m_timeSinceAttack > 0.25f && !m_rolling)
-        {
-            m_currentAttack++;
+		//Check if character just landed on the ground
+		if (!m_grounded && m_groundSensor.State()){
+			m_grounded = true;
+			m_animator.SetBool("Grounded", m_grounded);
+		}
 
-            // Loop back to one after third attack
-            if (m_currentAttack > 3)
-                m_currentAttack = 1;
+		//Check if character just started falling
+		if (m_grounded && !m_groundSensor.State()){
+			m_grounded = false;
+			m_animator.SetBool("Grounded", m_grounded);
+		}
 
-            // Reset Attack combo if time since last attack is too large
-            if (m_timeSinceAttack > 1.0f)
-                m_currentAttack = 1;
+		// -- Handle input and movement --
+		var inputX = Input.GetAxis("Horizontal");
 
-            // Call one of three attack animations "Attack1", "Attack2", "Attack3"
-            m_animator.SetTrigger("Attack" + m_currentAttack);
+		// Swap direction of sprite depending on walk direction
+		if (inputX > 0){
+			GetComponent<SpriteRenderer>().flipX = false;
+			m_facingDirection = 1;
+		}
 
-            // Reset timer
-            m_timeSinceAttack = 0.0f;
-        }
+		else if (inputX < 0){
+			GetComponent<SpriteRenderer>().flipX = true;
+			m_facingDirection = -1;
+		}
 
-        // Block
-        else if (Input.GetMouseButtonDown(1) && !m_rolling)
-        {
-            m_animator.SetTrigger("Block");
-            m_animator.SetBool("IdleBlock", true);
-        }
+		// Move
+		if (!m_rolling)
+			m_body2d.linearVelocity = new Vector2(inputX * m_speed, m_body2d.linearVelocity.y);
 
-        else if (Input.GetMouseButtonUp(1))
-            m_animator.SetBool("IdleBlock", false);
+		//Set AirSpeed in animator
+		m_animator.SetFloat("AirSpeedY", m_body2d.linearVelocity.y);
 
-        // Roll
-        else if (Input.GetKeyDown("left shift") && !m_rolling && !m_isWallSliding)
-        {
-            m_rolling = true;
-            m_animator.SetTrigger("Roll");
-            m_body2d.linearVelocity = new Vector2(m_facingDirection * m_rollForce, m_body2d.linearVelocity.y);
-        }
-            
+		// -- Handle Animations --
+		//Wall Slide
+		m_isWallSliding = (m_wallSensorR1.State() && m_wallSensorR2.State()) ||
+		                  (m_wallSensorL1.State() && m_wallSensorL2.State());
+		m_animator.SetBool("WallSlide", m_isWallSliding);
 
-        //Jump
-        else if (Input.GetKeyDown("space") && m_grounded && !m_rolling)
-        {
-            m_animator.SetTrigger("Jump");
-            m_grounded = false;
-            m_animator.SetBool("Grounded", m_grounded);
-            m_body2d.linearVelocity = new Vector2(m_body2d.linearVelocity.x, m_jumpForce);
-            m_groundSensor.Disable(0.2f);
-        }
+		//Attack
+		if (Input.GetMouseButtonDown(0) && m_timeSinceAttack > 0.25f && !m_rolling){
+			m_currentAttack++;
 
-        //Run
-        else if (Mathf.Abs(inputX) > Mathf.Epsilon)
-        {
-            // Reset timer
-            m_delayToIdle = 0.05f;
-            m_animator.SetInteger("AnimState", 1);
-        }
+			// Loop back to one after third attack
+			if (m_currentAttack > 3)
+				m_currentAttack = 1;
 
-        //Idle
-        else
-        {
-            // Prevents flickering transitions to idle
-            m_delayToIdle -= Time.deltaTime;
-                if(m_delayToIdle < 0)
-                    m_animator.SetInteger("AnimState", 0);
-        }
-        
-        // Codigo creado por mi
-        // Whip
-        if (Input.GetKeyDown("f") && !m_rolling)
-        {
-            m_animator.SetTrigger("Whip");
-            AE_Whip();
-            //m_animator.SetBool("IdleBlock", true);
-        }
+			// Reset Attack combo if time since last attack is too large
+			if (m_timeSinceAttack > 1.0f)
+				m_currentAttack = 1;
 
-        if (Input.GetKeyDown(KeyCode.P)){
-            GameManager.instance.PlayerReceiveDamage(1);
-        }
+			// Call one of three attack animations "Attack1", "Attack2", "Attack3"
+			m_animator.SetTrigger("Attack" + m_currentAttack);
 
-        
-        damageByFall();
-        
-        if (isInvincible){
-            timeInvincible -= Time.deltaTime;
-            if (timeInvincible < 0){
-                isInvincible = false;
-                timeInvincible = 2.0f;
-            }
-        }
+			// Reset timer
+			m_timeSinceAttack = 0.0f;
 
-        if (health <= 0){
-            GameManager.instance.PlayerDie();
-             
-        }
-    }
+			// Attack logic
+		}
 
-    private void damageByFall(){
-        if (m_body2d.linearVelocity.y < 0){
-            distanceYFall += m_body2d.linearVelocity.y * Time.deltaTime;
-            if (distanceYFall < -maxDistanceYFallDamage){
-                doDamageFall = true;
-            }
-        } else {
-            distanceYFall = 0;
-        }
+		// Block
+		else if (Input.GetMouseButtonDown(1) && !m_rolling){
+			m_animator.SetTrigger("Block");
+			m_animator.SetBool("IdleBlock", true);
+		}
 
-        if (m_body2d.linearVelocity.y == 0 && doDamageFall){
-            GameManager.instance.PlayerReceiveDamage(1);
-            doDamageFall = false;
-        }
-    }
+		else if (Input.GetMouseButtonUp(1)){
+			m_animator.SetBool("IdleBlock", false);
+		}
 
-    
-    
-    // Animation Events
-    // Called in slide animation.
-    void AE_SlideDust()
-    {
-        Vector3 spawnPosition;
+		// Roll
+		else if (Input.GetKeyDown("left shift") && !m_rolling && !m_isWallSliding){
+			m_rolling = true;
+			m_animator.SetTrigger("Roll");
+			m_body2d.linearVelocity = new Vector2(m_facingDirection * m_rollForce, m_body2d.linearVelocity.y);
+		}
 
-        if (m_facingDirection == 1)
-            spawnPosition = m_wallSensorR2.transform.position;
-        else
-            spawnPosition = m_wallSensorL2.transform.position;
+		//Jump
+		else if (Input.GetKeyDown("space") && m_grounded && !m_rolling){
+			m_animator.SetTrigger("Jump");
+			m_grounded = false;
+			m_animator.SetBool("Grounded", m_grounded);
+			m_body2d.linearVelocity = new Vector2(m_body2d.linearVelocity.x, m_jumpForce);
+			m_groundSensor.Disable(0.2f);
+		}
 
-        if (m_slideDust != null)
-        {
-            // Set correct arrow spawn position
-            GameObject dust = Instantiate(m_slideDust, spawnPosition, gameObject.transform.localRotation) as GameObject;
-            // Turn arrow in correct direction
-            dust.transform.localScale = new Vector3(m_facingDirection, 1, 1);
-        }
-    }
-    
-    // Funciones creadas por mi
-    void AE_Whip()
-    {
-        // Obtén la posición del ratón en el mundo
-        Vector3 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-        mousePosition.z = 0; // Asegúrate de que la posición Z sea 0
+		//Run
+		else if (Mathf.Abs(inputX) > Mathf.Epsilon){
+			// Reset timer
+			m_delayToIdle = 0.05f;
+			m_animator.SetInteger("AnimState", 1);
+		}
 
-        // Calcula la dirección desde el personaje hacia el ratón
-        Vector3 direction = (mousePosition - gameObject.transform.position).normalized;
-    
-        // Calcula la distancia desde el personaje hasta el ratón
-        float distanceToMouse = Vector3.Distance(gameObject.transform.position, mousePosition);
-    
-        Debug.Log("Direccion: " + direction);
-        Debug.Log("Distancia al ratón: " + distanceToMouse);
+		//Idle
+		else{
+			// Prevents flickering transitions to idle
+			m_delayToIdle -= Time.deltaTime;
+			if (m_delayToIdle < 0)
+				m_animator.SetInteger("AnimState", 0);
+		}
 
-        // Verifica si la distancia es menor o igual a la distancia máxima del látigo
-        if (distanceToMouse <= m_distanceWhip)
-        {
-            Debug.Log("El látigo llega al objetivo.");
-            // Aquí puedes agregar la lógica para cuando el látigo alcanza el objetivo
-        }
-        else
-        {
-            Debug.Log("El látigo no llega al objetivo.");
-        }
+		// Codigo creado por mi
+		// Whip
+		if (Input.GetKeyDown("f") && !m_rolling){
+			m_animator.SetTrigger("Whip");
+			AE_Whip();
+			//m_animator.SetBool("IdleBlock", true);
+		}
 
-        Debug.DrawLine(gameObject.transform.position, mousePosition, Color.red, 3);
-    }
+		if (Input.GetKeyDown(KeyCode.P)) GameManager.instance.PlayerReceiveDamage(1);
 
-    
-    private void OnTriggerEnter2D(Collider2D other){
-        if (other.gameObject.CompareTag("Enemy") && !isInvincible){
-            GameManager.instance.PlayerReceiveDamage(1);
-            isInvincible = true;
-        }
-    }
+		damageByFall();
+
+		if (isInvincible){
+			timeInvincible -= Time.deltaTime;
+			if (timeInvincible < 0){
+				isInvincible = false;
+				timeInvincible = 2.0f;
+			}
+		}
+
+		if (health <= 0) GameManager.instance.PlayerDie();
+	}
+
+	private void OnTriggerEnter2D(Collider2D other){
+		if (other.gameObject.CompareTag("Enemy") && !isInvincible){
+			GameManager.instance.PlayerReceiveDamage(1);
+			isInvincible = true;
+		}
+	}
+
+	public void Death(){
+		m_animator.SetBool("noBlood", m_noBlood);
+		m_animator.SetTrigger("Death");
+	}
+
+	public void Hurt(){
+		m_animator.SetTrigger("Hurt");
+	}
+
+	private void damageByFall(){
+		if (m_body2d.linearVelocity.y < 0){
+			distanceYFall += m_body2d.linearVelocity.y * Time.deltaTime;
+			if (distanceYFall < -maxDistanceYFallDamage) doDamageFall = true;
+		}
+		else{
+			distanceYFall = 0;
+		}
+
+		if (m_body2d.linearVelocity.y == 0 && doDamageFall){
+			GameManager.instance.PlayerReceiveDamage(1);
+			doDamageFall = false;
+		}
+	}
+
+	// Animation Events
+	// Called in slide animation.
+	private void AE_SlideDust(){
+		Vector3 spawnPosition;
+
+		if (m_facingDirection == 1)
+			spawnPosition = m_wallSensorR2.transform.position;
+		else
+			spawnPosition = m_wallSensorL2.transform.position;
+
+		if (m_slideDust != null){
+			// Set correct arrow spawn position
+			var dust = Instantiate(m_slideDust, spawnPosition, gameObject.transform.localRotation);
+			// Turn arrow in correct direction
+			dust.transform.localScale = new Vector3(m_facingDirection, 1, 1);
+		}
+	}
+
+	// Funciones creadas por mi
+	private void AE_Whip(){
+		// Obtén la posición del ratón en el mundo
+		var mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+		mousePosition.z = 0; // Asegúrate de que la posición Z sea 0
+
+		// Calcula la dirección desde el personaje hacia el ratón
+		var direction = (mousePosition - gameObject.transform.position).normalized;
+
+		// Calcula la distancia desde el personaje hasta el ratón
+		var distanceToMouse = Vector3.Distance(gameObject.transform.position, mousePosition);
+
+		Debug.Log("Direccion: " + direction);
+		Debug.Log("Distancia al ratón: " + distanceToMouse);
+
+		// Verifica si la distancia es menor o igual a la distancia máxima del látigo
+		if (distanceToMouse <= m_distanceWhip)
+			Debug.Log("El látigo llega al objetivo.");
+		// Aquí puedes agregar la lógica para cuando el látigo alcanza el objetivo
+		else
+			Debug.Log("El látigo no llega al objetivo.");
+
+		Debug.DrawLine(gameObject.transform.position, mousePosition, Color.red, 3);
+	}
 }
