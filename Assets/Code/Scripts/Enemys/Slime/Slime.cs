@@ -9,6 +9,8 @@ public class Slime : MonoBehaviour{
 	[Header("Slime Stats")] [SerializeField]
 	private int _health;
 
+	[SerializeField] private int points;
+	[SerializeField] private bool isDead;
 	[SerializeField] private int _damage;
 	[SerializeField] private float _jump;
 	[SerializeField] private float _cooldownJump = 2f;
@@ -18,25 +20,28 @@ public class Slime : MonoBehaviour{
 		_spriteRenderer = GetComponent<SpriteRenderer>();
 		_animator = GetComponent<Animator>();
 	}
-
-	// Update is called once per frame 
-	private void Update(){
-		if (_health <= 0) Death();
-	}
-
+	
 	private void OnCollisionEnter2D(Collision2D other){
 		if (other.gameObject.CompareTag("Player")){
-			_animator.SetTrigger("Hurt");
 			GameManager.instance.PlayerReceiveDamage(_damage);
 		}
 	}
 
 	private void Death(){
+		Destroy(gameObject, 1f);
 		Destroy(this, 1f);
 	}
 
 	public void ReceiveDamage(int damage){
+		if (isDead) return;
 		_health -= damage;
-		if (_health <= 0) _animator.SetTrigger("Death");
+		if (_health <= 0){
+			_animator.SetTrigger("Death");
+			GameManager.instance.addPoints(points);
+			isDead = true;
+			Death();
+		}else{
+			_animator.SetTrigger("Hurt");
+		}
 	}
 }

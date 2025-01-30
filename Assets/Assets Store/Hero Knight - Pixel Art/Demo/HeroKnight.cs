@@ -60,6 +60,10 @@ public class HeroKnight : MonoBehaviour{
 
 	// Update is called once per frame
 	private void Update(){
+		if (isDead) return;
+		if (health <= 0){
+			Death();
+		}
 		// Increase timer that controls attack combo
 		m_timeSinceAttack += Time.deltaTime;
 
@@ -129,6 +133,24 @@ public class HeroKnight : MonoBehaviour{
 			m_timeSinceAttack = 0.0f;
 
 			// Attack logic
+			Vector3 offset = GetComponent<SpriteRenderer>().flipX ? Vector3.left : Vector3.right;
+			Vector3 start = new Vector3(transform.position.x, transform.position.y + 0.5f, transform.position.z) + offset;
+			Debug.DrawRay(start, GetComponent<SpriteRenderer>().flipX ? Vector2.left : Vector2.right * 2f, Color.red, 1.0f);
+			var hit = Physics2D.Raycast(start, GetComponent<SpriteRenderer>().flipX ? Vector2.left : Vector2.right, 2f);
+
+			if (hit.collider != null){
+				Debug.Log("Hit: " + hit.collider.name);
+				if (hit.collider.CompareTag("Enemy")){
+					Debug.Log("Enemy hit");
+					hit.collider.GetComponent<Slime>().ReceiveDamage(1);
+				}
+				else{
+					Debug.Log("Hit, but not an enemy");
+				}
+			}
+			else{
+				Debug.Log("No hit detected");
+			}
 		}
 
 		// Block
@@ -205,6 +227,7 @@ public class HeroKnight : MonoBehaviour{
 	public void Death(){
 		m_animator.SetBool("noBlood", m_noBlood);
 		m_animator.SetTrigger("Death");
+		isDead = true;
 	}
 
 	public void Hurt(){
@@ -246,23 +269,18 @@ public class HeroKnight : MonoBehaviour{
 
 	// Funciones creadas por mi
 	private void AE_Whip(){
-		// Obtén la posición del ratón en el mundo
-		var mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-		mousePosition.z = 0; // Asegúrate de que la posición Z sea 0
 
-		// Calcula la dirección desde el personaje hacia el ratón
+		var mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+		mousePosition.z = 0;
 		var direction = (mousePosition - gameObject.transform.position).normalized;
 
-		// Calcula la distancia desde el personaje hasta el ratón
 		var distanceToMouse = Vector3.Distance(gameObject.transform.position, mousePosition);
 
 		Debug.Log("Direccion: " + direction);
 		Debug.Log("Distancia al ratón: " + distanceToMouse);
-
-		// Verifica si la distancia es menor o igual a la distancia máxima del látigo
+		
 		if (distanceToMouse <= m_distanceWhip)
 			Debug.Log("El látigo llega al objetivo.");
-		// Aquí puedes agregar la lógica para cuando el látigo alcanza el objetivo
 		else
 			Debug.Log("El látigo no llega al objetivo.");
 

@@ -6,6 +6,7 @@ TagManager:
   tags:
   - Enemy
   - Chest
+  - Scalable
   layers:
   - Default
   - TransparentFX
